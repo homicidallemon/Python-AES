@@ -1,2 +1,2 @@
 # Python-AES
-A python implementation of the AES algorithm
+A python implementation of the Rijndael algorithm
