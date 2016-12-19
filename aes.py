@@ -1,3 +1,4 @@
+from collections import deque
 global Rcon, PermMatrix
 
 #12-word list previously chosen
@@ -22,87 +23,162 @@ PermMatrix = \
     [0xBA, 0x78, 0x25, 0x2E, 0x1C, 0xA6, 0xB4, 0xC6, 0xE8, 0xDD, 0x74, 0x1F, 0x4B, 0xBD, 0x8B, 0x8A],
     [0x70, 0x3E, 0xB5, 0x66, 0x48, 0x03, 0xF6, 0x0E, 0x61, 0x35, 0x57, 0xB9, 0x86, 0xC1, 0x1D, 0x9E],
     [0xE1, 0xF8, 0x98, 0x11, 0x69, 0xD9, 0x8E, 0x94, 0x9B, 0x1E, 0x87, 0xE9, 0xCE, 0x55, 0x28, 0xDF],
-	 [0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16]]
+	[0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16]]
 
-#rotates word 1 bit to the left
-def rotWord(word):
-	return word<<1
+def main():
+    a = raw_input()
+    #a = format(int(a,2), '#0'+str(len(a)+2)+'b')
+    a = sub_word(a)
+    a = transpose_lines(a)
+    a = map(list,zip(*a))
+    final = []
+    c = Columns()
+    for i in a:
+        final.append(c.transform(i))
+    final = map(list,zip(*final))
+    
+    print(transpose_lines(a))
 
-#returns a list of the hexadecimal equivalent of a binary string
-def strToHex(string):
-	string = int(string,2)
-	hex_list = list(hex(string))
-	cont     = 0
+class Columns:
+    def m2(self, x):
+        if(x < 128):
+            return 2*x
+        return ((2*x) & (0x1B))
 
-	for i in hex_list:
-		if(i != 'x'):
-			hex_list[cont] = int(i, base=16)
+    def m3(self, x):
+        return (self.m2(x) ^ x)
+
+    def transform(self, b):
+        s = [None, None, None, None]
+
+        s[0] = self.m2(b[0]) ^ self.m3(b[1]) ^ b[2] ^ b[3]
+        s[1] = b[0] ^ self.m2(b[1]) ^ self.m3(b[2]) ^ b[3]
+        s[2] = b[0] ^ b[1] ^ self.m2(b[2]) ^ self.m3(b[3])
+        s[3] = self.m3(b[0]) ^ b[1] ^ b[2] ^ self.m2(b[3])
+
+        return (s)
+
+def transpose_lines(word):
+    
+    """takes a 16-byte input and considers it a 4-by-4 matrix, it then rotates the all lines by i bytes
+    where i is the line index"""
+
+    bin_word    = ''
+    matrix      = []
+    matrix_line = []
+    word = str(word)
+
+    for i in range(16*8):
+        bin_word += word[i]
+        if(not (i+1)%8):
+            matrix_line.append(int(bin_word,2)) 
+            bin_word = ''
+            if(not (i+1)%32):
+                matrix.append(matrix_line)
+                matrix_line = []
+
+
+    matrix = map(list,zip(*matrix))    #transposes matrix
+    matrix = map(deque, matrix)
+
+    for i in range(1, len(matrix)):
+        matrix[i].rotate(-i)
+
+    return map(list, matrix)
+
+
+
+def rot_word(word):
+
+    """rotates word 1 bit to the left"""
+
+    return word<<1
+
+def str_to_hex(string):
+
+    """returns a list of the hexadecimal equivalent of a binary string"""
+
+    string = int(string,2)
+    hex_list = list(hex(string))
+    cont     = 0
+
+    for i in hex_list:
+        if(i != 'x'):
+            hex_list[cont] = int(i, base=16)
 			
-		cont += 1
+        cont += 1
 
-	return hex_list
+    return hex_list
 
-#returns the integer equivalent of a hexadecimal list
-def hexToInt(hx):
-	cont = 0
+def hex_to_int(hx):
 
-	for i in hx:
-		hx[cont] = bin(i)[2:].zfill(8)
-		cont += 1
-	a = []
-	for i in hx:
-		a.append(int(i,2))
-	a = map(hex,a)
-	print(a)
+    """returns the integer equivalent of a hexadecimal list"""
 
-	bin_word = ''
+    cont = 0
 
-	for i in hx:
-		bin_word += i
+    for i in hx:
+        hx[cont] = bin(i)[2:].zfill(8)
+        cont += 1
+    a = []
+    for i in hx:
+        a.append(int(i,2))
+    a = map(hex,a)
+    print(a)
 
-	return format(int(bin_word, base=2), '#0'+str(len(bin_word)+2)+'b')
+    bin_word = ''
 
-#gets a 16-bit word and replaces them according to the permutation matrix
-def subWord(word):
-	for i in word:
-		if(i == 'b'):
-			new_word = []
-			counter  = 1
-			bin_word = ''
+    for i in hx:
+        bin_word += i
 
-		else:
-			try:
-				bin_word += str(i)
-				if(counter%8 == 0):
-					byte     = strToHex(bin_word)
-					new_word.append(PermMatrix[byte[2]][byte[3]])
+    return format(int(bin_word, base=2), '#0'+str(len(bin_word)+2)+'b')
 
-					bin_word = ''
+def sub_word(word):
 
-				counter += 1
+    """gets a 16-bit word and replaces them according to the permutation matrix"""
 
-			except: pass
+    #a = format(int(a,2), '#0'+str(len(a)+2)+'b')
+
+    for i in word:
+        if(i == 'b'):
+            new_word = []
+            counter  = 1
+            bin_word = ''
+
+        else:
+            try:
+                bin_word += str(i)
+                if(counter%8 == 0):
+                    byte     = str_to_hex(bin_word)
+                    new_word.append(PermMatrix[byte[2]][byte[3]])
+
+                    bin_word = ''
+
+                counter += 1
+
+            except: pass
 	
-	return hexToInt(new_word)
+    return hex_to_int(new_word)
 			
 
-#gets a 16-byte key and generates 11 keys to be used by the algorithm
-def generateKeys(key, keys):
-	for i in range(4):
-		keys[i] = key[i]
+def generate_keys(key, keys):
 
-	for i in range(4, 44):
-		temp = keys[i-1]
-		if(i%4 == 0):
-			temp = subWord(rotWord(temp)) ^ Rcon[i/4]
+    """gets a 16-byte key and generates 11 keys to be used by the algorithm"""
 
-		keys[i] = keys[i-4] ^ temp
+    for i in range(4):
+        keys[i] = key[i]
 
-#gets a 16-byte key and a 16-byte block from the plain text and combines them
-def combineKeys(key, block):
-	return key ^ block
+    for i in range(4, 44):
+        temp = keys[i-1]
+        if(i%4 == 0):
+            temp = sub_word(rot_word(temp)) ^ Rcon[i/4]
 
+        keys[i] = keys[i-4] ^ temp
 
-#a = raw_input()
-#a = format(int(a,2), '#0'+str(len(a)+2)+'b')
-#print(subWord(a))
+def combine_keys(key, block):
+
+    """gets a 16-byte key and a 16-byte block from the plain text and combines them"""
+
+    return key ^ block
+
+if __name__ == "__main__":
+    main()
